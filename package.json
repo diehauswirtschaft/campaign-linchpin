@@ -1,0 +1,31 @@
+{
+  "name": "campaign-postman",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=saveForm",
+    "deploy": "gcloud functions deploy saveForm --env-vars-file .env.yaml --runtime nodejs14 --trigger-http --allow-unauthenticated --region=\"europe-west3\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diehauswirtschaft/campaign-postman.git"
+  },
+  "author": "Philipp Naderer-Puiu",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/diehauswirtschaft/campaign-postman/issues"
+  },
+  "homepage": "https://github.com/diehauswirtschaft/campaign-postman#readme",
+  "dependencies": {
+    "@google-cloud/firestore": "^4.4.0",
+    "@google-cloud/functions-framework": "^1.7.1",
+    "@google-cloud/storage": "^5.8.0",
+    "axios": "^0.21.1",
+    "form-data": "^4.0.0",
+    "joi": "^17.4.0",
+    "pdfkit": "^0.11.0"
+  }
+}
