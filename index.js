@@ -21,6 +21,7 @@ const {
     MT_LABEL_PAKET_DEFAULT,
 } = process.env;
 
+const TEXT_FONT_SIZE = 11;
 const LABELS = {
     interessentin: parseInt(MT_LABEL_INTERESSENTIN),
     funnelWebsite: parseInt(MT_LABEL_FUNNEL_WEBSITE),
@@ -129,9 +130,9 @@ exports.saveForm = async (req, res) => {
                 { label: "Schon Interessent*in", value: value.fields.interessentin.value },
             ].forEach(line => {
                 doc
-                    .font("Helvetica-Bold", 12)
+                    .font("Helvetica-Bold", TEXT_FONT_SIZE)
                     .text(`${line.label}:  `, { continued: true })
-                    .font("Helvetica", 12)
+                    .font("Helvetica", TEXT_FONT_SIZE)
                     .text(escapeValue(line.value));
             });
             doc.moveDown();
@@ -144,9 +145,9 @@ exports.saveForm = async (req, res) => {
                 { label: "Sonstige Fragen und Infos?", value: value.fields.sonstiges.value },
             ].forEach(line => {
                 doc
-                    .font("Helvetica-Bold", 12)
+                    .font("Helvetica-Bold", TEXT_FONT_SIZE)
                     .text(line.label)
-                    .font("Helvetica", 12)
+                    .font("Helvetica", TEXT_FONT_SIZE)
                     .text(escapeValue(line.value) || "-")
                     .moveDown();
             });
