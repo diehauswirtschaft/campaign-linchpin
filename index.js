@@ -1,13 +1,3 @@
-const fs = require("fs");
-
-const Joi = require("joi");
-const axios = require("axios");
-const FormData = require("form-data");
-const PDFDocument = require("pdfkit");
-
-const {Storage} = require("@google-cloud/storage");
-const storage = new Storage();
-
 const {
     GCP_STORAGE_BUCKET,
     MT_TOKEN,
@@ -19,7 +9,18 @@ const {
     MT_LABEL_PAKET_3,
     MT_LABEL_PAKET_4,
     MT_LABEL_PAKET_DEFAULT,
+    POSTMARK_TOKEN,
 } = process.env;
+
+const fs = require("fs");
+const Joi = require("joi");
+const axios = require("axios");
+const postmark = require("postmark");
+const FormData = require("form-data");
+const PDFDocument = require("pdfkit");
+
+const {Storage} = require("@google-cloud/storage");
+const storage = new Storage();
 
 const TEXT_FONT_SIZE = 11;
 const LABELS = {
@@ -49,6 +50,8 @@ const shortFieldSchema = Joi.object({
     raw_value: Joi.string().allow("").max(100),
     required: Joi.string().allow(""),
 });
+
+const emailSchema = Joi.string().email();
 
 function escapeValue(str) {
     return str.replace(/\n/g, " ").replace(/ +/g, " ").trim();
@@ -97,6 +100,7 @@ async function createTask(requestId, form) {
         [
             { label: "Name", value: form.fields.name.value },
             { label: "E-Mail", value: form.fields.email.value },
+            { label: "Webseite", value: form.fields.webseite.value },
             { label: "Telefon", value: form.fields.telefon.value },
             { label: "Paket", value: form.fields.paket.value },
             { label: "Schon Interessent*in", value: form.fields.interessentin.value },
@@ -105,7 +109,7 @@ async function createTask(requestId, form) {
                 .font("Helvetica-Bold", TEXT_FONT_SIZE)
                 .text(`${line.label}:  `, { continued: true })
                 .font("Helvetica", TEXT_FONT_SIZE)
-                .text(escapeValue(line.value));
+                .text(escapeValue(line.value) || "-");
         });
         doc.moveDown();
 
@@ -139,6 +143,7 @@ async function createTask(requestId, form) {
     const name = escapeValue(escapeMtmd(form.fields.name.value));
     const email = escapeValue(escapeMtmd(form.fields.email.value));
     const phone = escapeValue(escapeMtmd(form.fields.telefon.value));
+    const website = escapeValue(escapeMtmd(form.fields.webseite.value));
     const alreadyOnList = /ja/i.test(form.fields.interessentin.value);
 
     if (email.length >= 6 && email.length <= 100) {
@@ -151,6 +156,12 @@ async function createTask(requestId, form) {
         notes.push(`Telefon: ${phone}`);
     } else {
         notes.push(`Telefon: -`);
+    }
+
+    if (website.length >= 6 && website.length <= 100) {
+        notes.push(`Webseite: ${website}`);
+    } else {
+        notes.push(`Webseite: -`);
     }
 
     if (alreadyOnList) {
@@ -212,6 +223,25 @@ async function createTask(requestId, form) {
     return null;
 }
 
+async function sendConfirmationMail(recipient) {
+    const client = new postmark.ServerClient(POSTMARK_TOKEN);
+    try{
+        const htmlBody = await fs.promises.readFile(`${__dirname}/confirmation-mail.html`, "utf8");
+        const textBody = await fs.promises.readFile(`${__dirname}/confirmation-mail.txt`, "utf8");
+
+        await client.sendEmail({
+            From: "die HausWirtschaft mitmachen@diehauswirtschaft.at",
+            ReplyTo: "mitmachen@diehauswirtschaft.at",
+            To: recipient,
+            Subject: "Danke für deine Bewerbung im Call!",
+            HtmlBody: htmlBody,
+            TextBody: textBody,
+        });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
 exports.saveForm = async (req, res) => {
     if (req.method === "POST") {
         res.setHeader("Cache-Control", "no-cache");
@@ -235,6 +265,7 @@ exports.saveForm = async (req, res) => {
                 sonstiges: fieldSchema,
                 name: shortFieldSchema,
                 email: shortFieldSchema,
+                webseite: shortFieldSchema,
                 telefon: shortFieldSchema,
                 interessentin: shortFieldSchema,
                 paket: shortFieldSchema,
@@ -257,6 +288,12 @@ exports.saveForm = async (req, res) => {
                 console.error(`Failed to create a task for request ${requestId}.`);
             }
         });
+
+        // If e-mail is valid, send back a confirmation mail.
+        const {emailError} = emailSchema.validate(value.fields.email.value);
+        if (!emailError) {
+            sendConfirmationMail(value.fields.email.value).then(() => { /* do nothing */});
+        }
 
         return res.status(200).send("Submitted.");
     } else {

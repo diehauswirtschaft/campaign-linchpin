@@ -105,3 +105,5 @@ dist
 
 # GCP
 /.env.yaml
+/confirmation-mail.html
+/confirmation-mail.txt
