@@ -18,6 +18,7 @@ const axios = require("axios");
 const postmark = require("postmark");
 const FormData = require("form-data");
 const PDFDocument = require("pdfkit");
+const {resolveMx} = require("dns").promises;
 
 const {Storage} = require("@google-cloud/storage");
 const storage = new Storage();
@@ -223,6 +224,29 @@ async function createTask(requestId, form) {
     return null;
 }
 
+/**
+ * Checks through the DNS if the given e-mail address is backed with a valid MX record.
+ */
+async function acceptsEmail(emailAddress) {
+    const addressParts = emailAddress.split("@").map(part => part.trim());
+
+    if (addressParts.length === 2) {
+        try {
+            const mx = await resolveMx(addressParts[1]);
+            if (mx.length > 0) {
+                return mx[0].exchange !== "" || mx[0].priority !== 0;
+            }
+        } catch (e) {
+            // do nothing
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Sends a confirmation e-mail to the applicant.
+ */
 async function sendConfirmationMail(recipient) {
     const client = new postmark.ServerClient(POSTMARK_TOKEN);
     try{
@@ -242,6 +266,10 @@ async function sendConfirmationMail(recipient) {
     }
 }
 
+/**
+ * The Cloud Function responsible for handling a form submit via an Elementor Webhook action.
+ * @see https://elementor.com/help/actions-after-submit/
+ */
 exports.saveForm = async (req, res) => {
     if (req.method === "POST") {
         res.setHeader("Cache-Control", "no-cache");
@@ -290,9 +318,14 @@ exports.saveForm = async (req, res) => {
         });
 
         // If e-mail is valid, send back a confirmation mail.
-        const {emailError} = emailSchema.validate(value.fields.email.value);
-        if (!emailError) {
-            sendConfirmationMail(value.fields.email.value).then(() => { /* do nothing */});
+        const emailAddress = value.fields.email.value;
+        const emailValidation = emailSchema.validate(emailAddress);
+        if (!emailValidation.error) {
+            acceptsEmail(emailAddress).then(accepts => {
+                if (accepts) {
+                    sendConfirmationMail(emailAddress).then(() => { /* do nothing */});
+                }
+            });
         }
 
         return res.status(200).send("Submitted.");
