@@ -133,6 +133,8 @@ async function createTask(requestId, form) {
             .moveDown()
             .font("Helvetica", 8)
             .text("Generiert um " + new Date().toLocaleString("de-AT", { timeZone: "Europe/Vienna" }));
+    } catch (e) {
+        console.error(e);
     } finally {
         doc.end();
     }
@@ -216,9 +218,11 @@ async function createTask(requestId, form) {
             return task.data.id;
         } catch (e) {
             console.error(`Could not upload PDF for task ${task.data.id}`);
+            console.error(e);
         }
     } catch (e) {
         console.error(`Could not add to Meistertask: ${e}`);
+        console.error(e);
     }
 
     return null;
@@ -237,7 +241,7 @@ async function acceptsEmail(emailAddress) {
                 return mx[0].exchange !== "" || mx[0].priority !== 0;
             }
         } catch (e) {
-            // do nothing
+            console.error(e);
         }
     }
 
