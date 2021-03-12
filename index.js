@@ -77,10 +77,10 @@ async function storeRequest(requestId, bodyObj) {
 }
 
 /**
- * Creates a new task in MeisterTask and attaches a PDF to it.
+ * Creates a new PDF with all form values and pipes it
+ * into the given WriteStream object.
  */
-async function createTask(requestId, form) {
-    const pdfPath = `/tmp/${requestId}.pdf`;
+function writePDF(out, form) {
     const doc = new PDFDocument({
         size: "A4",
         margins: {
@@ -90,42 +90,42 @@ async function createTask(requestId, form) {
             right: 72,
         }
     });
-    doc.pipe(fs.createWriteStream(pdfPath));
+    doc.pipe(out);
     try {
         doc
             .font("Helvetica-Bold", 18)
-            .text(`Call-Bewerbung\n${escapeValue(form.fields.name.value)}`, {align: 'center'})
+            .text(`Call-Bewerbung\n${escapeValue(form.fields.name?.value || "")}`, {align: 'center'})
             .moveDown();
 
         // Inline-like fields.
         [
-            { label: "Name", value: form.fields.name.value },
-            { label: "E-Mail", value: form.fields.email.value },
-            { label: "Webseite", value: form.fields.webseite.value },
-            { label: "Telefon", value: form.fields.telefon.value },
-            { label: "Paket", value: form.fields.paket.value },
-            { label: "Schon Interessent*in", value: form.fields.interessentin.value },
+            { label: "Name", value: form.fields.name?.value },
+            { label: "E-Mail", value: form.fields.email?.value },
+            { label: "Webseite", value: form.fields.webseite?.value },
+            { label: "Telefon", value: form.fields.telefon?.value },
+            { label: "Paket", value: form.fields.paket?.value },
+            { label: "Schon Interessent*in", value: form.fields.interessentin?.value },
         ].forEach(line => {
             doc
                 .font("Helvetica-Bold", TEXT_FONT_SIZE)
                 .text(`${line.label}:  `, { continued: true })
                 .font("Helvetica", TEXT_FONT_SIZE)
-                .text(escapeValue(line.value) || "-");
+                .text(escapeValue(line?.value || "-"));
         });
         doc.moveDown();
 
         // Block-like fields.
         [
-            { label: "Wie möchtest Du die Gewerbefläche nutzen?", value: form.fields.gewerbe_nutzung.value },
-            { label: "Was gefällt Dir an dem Gedanken, Teil der Genossenschaft die HausWirtschaft zu werden?", value: form.fields.gedanken_community.value },
-            { label: "Wie möchtest Du dich in die Gemeinschaft einbringen?", value: form.fields.einbringen.value },
-            { label: "Sonstige Fragen und Infos?", value: form.fields.sonstiges.value },
+            { label: "Wie möchtest Du die Gewerbefläche nutzen?", value: form.fields.gewerbe_nutzung?.value },
+            { label: "Was gefällt Dir an dem Gedanken, Teil der Genossenschaft die HausWirtschaft zu werden?", value: form.fields.gedanken_community?.value },
+            { label: "Wie möchtest Du dich in die Gemeinschaft einbringen?", value: form.fields.einbringen?.value },
+            { label: "Sonstige Fragen und Infos?", value: form.fields.sonstiges?.value },
         ].forEach(line => {
             doc
                 .font("Helvetica-Bold", TEXT_FONT_SIZE)
                 .text(line.label)
                 .font("Helvetica", TEXT_FONT_SIZE)
-                .text(escapeValue(line.value) || "-")
+                .text(escapeValue(line?.value || "-"))
                 .moveDown();
         });
 
@@ -138,7 +138,12 @@ async function createTask(requestId, form) {
     } finally {
         doc.end();
     }
+}
 
+/**
+ * Creates a new task in MeisterTask and attaches a PDF to it.
+ */
+async function createTask(requestId, form) {
     const labels = [LABELS.funnelWebsite];
     const notes = [];
 
@@ -201,25 +206,31 @@ async function createTask(requestId, form) {
             }
         );
 
-        try {
-            const fd = new FormData();
-            fd.append("name", `call-${requestId}.pdf`);
-            fd.append("local", fs.createReadStream(pdfPath));
+        const pdfPath = `/tmp/${requestId}.pdf`;
+        const outStream = fs.createWriteStream(pdfPath);
+        writePDF(outStream, form);
+        outStream.on("finish", async () => {
+            try {
+                const fd = new FormData();
+                fd.append("name", `call-${requestId}.pdf`);
+                fd.append("local", fs.createReadStream(pdfPath));
 
-            const config = Object.assign({
-                method: "POST",
-                url: `https://www.meistertask.com/api/tasks/${task.data.id}/attachments`,
-                data: fd,
-                headers: Object.assign({}, fd.getHeaders(), { "Authorization": `Bearer ${MT_TOKEN}` }),
-            });
-            await axios.request(config);
-            await fs.promises.unlink(pdfPath);
+                const config = Object.assign({
+                    method: "POST",
+                    url: `https://www.meistertask.com/api/tasks/${task.data.id}/attachments`,
+                    data: fd,
+                    headers: Object.assign({}, fd.getHeaders(), { "Authorization": `Bearer ${MT_TOKEN}` }),
+                });
+                await axios.request(config);
+            } catch (e) {
+                console.error(`Could not upload PDF for task ${task.data.id} in request ${requestId}`);
+                console.error(e);
+            } finally {
+                await fs.promises.unlink(pdfPath);
+            }
+        });
 
-            return task.data.id;
-        } catch (e) {
-            console.error(`Could not upload PDF for task ${task.data.id}`);
-            console.error(e);
-        }
+        return task.data.id;
     } catch (e) {
         console.error(`Could not add to Meistertask: ${e}`);
         console.error(e);
@@ -335,6 +346,54 @@ exports.saveForm = async (req, res) => {
         return res.status(200).send("Submitted.");
     } else {
         res.set("Allow", "POST");
+        return res.status(405).send("Method Not Allowed");
+    }
+};
+
+/**
+ * Generates a PDF document for the given request id.
+ * This function must be secured and not be accessible unauthenticated!
+ */
+exports.exportPDF = async (req, res) => {
+    if (req.method === "GET") {
+        res.setHeader("Cache-Control", "no-cache");
+
+        const querySchema = Joi.object({
+            requestId: Joi.string().regex(/^\d{13}-\d{4}$/).required(),
+        });
+
+        const {error, value} = querySchema.validate(req.query);
+        if (error) {
+            console.warn(`Invalid parameters provided: ${JSON.stringify(error.details)}`);
+            return res.status(400).send("Invalid parameters provided!");
+        }
+
+        try {
+            const bucket = storage.bucket(GCP_STORAGE_BUCKET);
+            const file = bucket.file(`${value.requestId}.json`);
+
+            if (await file.exists()) {
+                const tmpRequestFile = `/tmp/export-${value.requestId}.json`;
+                await file.download({
+                    destination: tmpRequestFile,
+                });
+
+                const requestData = JSON.parse(await fs.promises.readFile(tmpRequestFile, "utf8"));
+                res.setHeader("Content-Type","application/pdf");
+                res.setHeader("Content-Disposition",`attachment; filename="${value.requestId}.pdf"`);
+                res.on("finish", () => {
+                    fs.promises.unlink(tmpRequestFile);
+                });
+                writePDF(res, requestData);
+            } else {
+                return res.status(404).send("Request file not found!");
+            }
+        } catch (e) {
+            console.error(e);
+            return res.status(500).send("Internal error.");
+        }
+    } else {
+        res.set("Allow", "GET");
         return res.status(405).send("Method Not Allowed");
     }
 };

@@ -6,7 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "functions-framework --target=saveForm",
-    "deploy": "gcloud functions deploy saveForm --env-vars-file .env.yaml --runtime nodejs14 --trigger-http --allow-unauthenticated --region=\"europe-west3\"",
+    "deploy-saveForm": "gcloud functions deploy saveForm --env-vars-file .env.yaml --runtime nodejs14 --trigger-http --allow-unauthenticated --region=\"europe-west3\"",
+    "deploy-exportPDF": "gcloud functions deploy exportPDF --env-vars-file .env.yaml --runtime nodejs14 --trigger-http --region=\"europe-west3\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
