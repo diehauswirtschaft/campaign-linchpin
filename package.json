@@ -1,33 +1,36 @@
 {
-  "name": "campaign-postman",
-  "version": "1.0.0",
+  "name": "campaign-linchpin",
+  "version": "1.1.0",
   "description": "",
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "functions-framework --target=saveForm",
+    "start-saveForm": "npx functions-framework --target=saveForm",
+    "start-exportPDF": "npx functions-framework --target=exportPDF",
     "deploy-saveForm": "gcloud functions deploy saveForm --env-vars-file .env.yaml --runtime nodejs14 --trigger-http --allow-unauthenticated --region=\"europe-west3\"",
     "deploy-exportPDF": "gcloud functions deploy exportPDF --env-vars-file .env.yaml --runtime nodejs14 --trigger-http --region=\"europe-west3\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/diehauswirtschaft/campaign-postman.git"
+    "url": "git+https://github.com/diehauswirtschaft/campaign-linchpin.git"
   },
   "author": "Philipp Naderer-Puiu",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/diehauswirtschaft/campaign-postman/issues"
+    "url": "https://github.com/diehauswirtschaft/campaign-linchpin/issues"
   },
-  "homepage": "https://github.com/diehauswirtschaft/campaign-postman#readme",
+  "homepage": "https://github.com/diehauswirtschaft/campaign-linchpin#readme",
   "dependencies": {
-    "@google-cloud/firestore": "^4.4.0",
-    "@google-cloud/functions-framework": "^1.7.1",
-    "@google-cloud/storage": "^5.8.0",
+    "@google-cloud/firestore": "^4.9.8",
+    "@google-cloud/storage": "^5.8.2",
     "axios": "^0.21.1",
     "form-data": "^4.0.0",
     "joi": "^17.4.0",
     "pdfkit": "^0.11.0",
-    "postmark": "^2.7.2"
+    "postmark": "^2.7.3"
+  },
+  "devDependencies": {
+    "@google-cloud/functions-framework": "^1.7.1"
   }
 }

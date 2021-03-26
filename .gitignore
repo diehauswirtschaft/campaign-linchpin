@@ -107,3 +107,5 @@ dist
 /.env.yaml
 /confirmation-mail.html
 /confirmation-mail.txt
+/dhwtesting-hauswirtschaft-1020.json
+/local-env.sh

@@ -1,6 +1,6 @@
 <img width="460" alt="die HausWirtschaft Logo" src="https://tools.diehauswirtschaft.at/public-static-files/logos/dhw-signet-logotype.png">
 
-# campaign-postman
+# campaign-linchpin
 
 A simple [Cloud Functions](https://cloud.google.com/functions?hl=en) based service to receive applications via an
 Elementor form used in the [HausWirtschaft call](https://diehauswirtschaft.at/call/).
