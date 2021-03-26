@@ -72,7 +72,8 @@ async function storeRequest(requestId, bodyObj) {
     try {
         await file.save(JSON.stringify(bodyObj, null, 2));
     } catch(e) {
-        console.error(e);
+        console.error(`Could not store JSON for request ${requestId}.`);
+        console.error(JSON.stringify(bodyObj, null, 0));
     }
 }
 
@@ -304,7 +305,7 @@ exports.saveForm = async (req, res) => {
         }
 
         const requestId = `${Date.now()}-${Math.ceil(Math.random() * 10000)}`;
-        storeRequest(requestId, req.body).then(() => { /* do nothing */ });
+        await storeRequest(requestId, req.body);
 
         const querySchema = Joi.object({
             form: Joi.object({
