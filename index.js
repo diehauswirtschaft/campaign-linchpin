@@ -173,7 +173,7 @@ async function createTask(requestId, form) {
     }
 
     if (alreadyOnList) {
-        notes.push("Ist bereits Interessent*In");
+        notes.push("Ist bereits Interessent*in");
         labels.push(LABELS.interessentin);
     }
 
@@ -209,26 +209,36 @@ async function createTask(requestId, form) {
         const pdfPath = `/tmp/${requestId}.pdf`;
         const outStream = fs.createWriteStream(pdfPath);
         writePDF(outStream, form);
-        outStream.on("finish", async () => {
-            try {
-                const fd = new FormData();
-                fd.append("name", `call-${requestId}.pdf`);
-                fd.append("local", fs.createReadStream(pdfPath));
 
-                const config = Object.assign({
-                    method: "POST",
-                    url: `https://www.meistertask.com/api/tasks/${task.data.id}/attachments`,
-                    data: fd,
-                    headers: Object.assign({}, fd.getHeaders(), { "Authorization": `Bearer ${MT_TOKEN}` }),
-                });
-                await axios.request(config);
-            } catch (e) {
-                console.error(`Could not upload PDF for task ${task.data.id} in request ${requestId}`);
-                console.error(e);
-            } finally {
-                await fs.promises.unlink(pdfPath);
-            }
+        // Wait for the PDF to be finished and upload it to the task.
+        await new Promise((resolve, reject) => {
+            outStream.on("finish", async () => {
+                try {
+                    const fd = new FormData();
+                    fd.append("name", `call-${requestId}.pdf`);
+                    fd.append("local", fs.createReadStream(pdfPath));
+
+                    const config = Object.assign({
+                        method: "POST",
+                        url: `https://www.meistertask.com/api/tasks/${task.data.id}/attachments`,
+                        data: fd,
+                        headers: Object.assign({}, fd.getHeaders(), { "Authorization": `Bearer ${MT_TOKEN}` }),
+                    });
+                    await axios.request(config);
+                } catch (e) {
+                    console.warn(`Could not upload PDF for task ${task.data.id} in request ${requestId}`);
+                    console.warn(e);
+                } finally {
+                    resolve();
+                }
+            });
         });
+
+        try {
+            await fs.promises.unlink(pdfPath);
+        } catch(e) {
+            console.warn(`Could not remove temporary PDF file at ${pdfPath}`);
+        }
 
         return task.data.id;
     } catch (e) {
